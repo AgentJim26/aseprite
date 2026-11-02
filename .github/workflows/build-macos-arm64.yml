@@ -1,0 +1,50 @@
+name: Build macOS arm64
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-macos-arm64.yml'
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja
+
+      - name: Download Skia
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/skia"
+          curl -L -o /tmp/skia.zip https://github.com/aseprite/skia/releases/download/m124-08a5439a6b/Skia-macOS-Release-arm64.zip
+          unzip -q /tmp/skia.zip -d "${GITHUB_WORKSPACE}/skia"
+          ls "${GITHUB_WORKSPACE}/skia/out/Release-arm64" | head
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR="${GITHUB_WORKSPACE}/skia" \
+            -DSKIA_LIBRARY_DIR="${GITHUB_WORKSPACE}/skia/out/Release-arm64"
+
+      - name: Build
+        run: ninja -C build aseprite
+
+      - name: Package
+        run: |
+          cd build/bin
+          zip -r -y Aseprite-macOS-arm64.zip Aseprite.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aseprite-macOS-arm64
+          path: build/bin/Aseprite-macOS-arm64.zip
